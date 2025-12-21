@@ -36,7 +36,8 @@ yankees_team_code = "NYY"
 optimizer = OptimizeLineup(mets_lineup, yankees_lineup, mets_team_code, yankees_team_code)
 optimal_lineup, win_rate = optimizer.optimize()
 
-optimizer.compare_lineups( mets_lineup, optimal_lineup, mets_team_code, mets_team_code, n_games= 10000, lineup_a_name="Original Mets Lineup", lineup_b_name="Optimized Mets Lineup")
+optimizer.compare_lineups(mets_lineup, optimal_lineup, mets_team_code, mets_team_code, n_games= 10000, lineup_a_name="Original Mets Lineup", lineup_b_name="Optimized Mets Lineup")
+
 #if len(mets_lineup) != 9 or len(yankees_lineup) != 9:
 #    print("Error: One or more players not found in CSV.")
 #    print(f"Mets: {len(mets_lineup)} players")

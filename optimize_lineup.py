@@ -90,11 +90,11 @@ class OptimizeLineup:
             print(f"  {i}. {player.name}")
         print(f"  Win Rate: {fitness_b:.3f} ({fitness_b*100:.1f}%)")
         
-        print(f"\n📊 Results:")
+        print(f"\n Results:")
         print(f"  Improvement: {improvement:+.2f}%")
         
         if fitness_b > fitness_a:
-            print(f"  🎉 {lineup_b_name} is better!")
+            print(f" {lineup_b_name} is better!")
         elif fitness_b < fitness_a:
             print(f"  {lineup_a_name} is better!")
         else:
@@ -107,7 +107,7 @@ class OptimizeLineup:
             'winner': lineup_b_name if fitness_b > fitness_a else lineup_a_name
         }
     
-    def optimize(self, team_code: str = PLAYER_TEAM_CODE, population_size: int = 50, elite_size: int = 5, mutation_rate: float = 0.2, generations: int = 30) -> Tuple[List[Player], float]:
+    def optimize(self, team_code: str = PLAYER_TEAM_CODE, population_size: int = 50, elite_size: int = 5, mutation_rate: float = 0.2, generations: int = 50) -> Tuple[List[Player], float]:
         population = [self.create_random_lineup(team_code) for _ in range(population_size)] 
        
         for generation in range(generations):
@@ -122,7 +122,7 @@ class OptimizeLineup:
     
             if(best_fitness > self.best_fitness):
                 self.best_fitness = best_fitness
-                self.best_lineups = best_lineup
+                self.best_lineup = best_lineup
     
             self.generation_history.append({
                 'generation': generation + 1,
@@ -141,6 +141,7 @@ class OptimizeLineup:
                 
                 child = self.crossover(parent1, parent2)
                 child = self.mutate(child, mutation_rate)
+                new_population.append(child)
     
             population = new_population
         
