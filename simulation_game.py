@@ -3,7 +3,11 @@ from player import Player
 from helper import load_all_players
 
 
-def simulate_game(players_lineup, opponents_lineup, player_team_code, opponent_team_code):
+def simulate_game(players_lineup, opponents_lineup, player_team_code, opponent_team_code, seed=None):
+
+    if seed is not None:
+        random.seed(seed)
+
     inning = 1
     top_of_inning = True
     bases = [False, False, False]

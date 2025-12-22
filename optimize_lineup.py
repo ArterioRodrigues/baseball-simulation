@@ -25,19 +25,27 @@ class OptimizeLineup:
         lineup = self.players_lineup if self.player_team_code == team_code else self.opponents_lineup
         return random.sample(lineup, len(lineup)) 
 
-    def evaluate_fitness(self, lineup: List[Player], team_code: str, n_games: int = 10000) -> float:
+    def evaluate_fitness(self, lineup: List[Player], team_code: str, n_games: int = 1000, game_seeds: List[int] = None) -> float:
         wins = 0
-        for _ in range(n_games): 
+
+
+        iterations = game_seeds if game_seeds is not None else range(n_games)
+        
+        for i in iterations:
+            seed = i if game_seeds is not None else None
+            
             if(team_code == self.player_team_code): 
-                result = simulate_game(lineup, self.opponents_lineup, team_code, self.opponent_team_code);
+                result = simulate_game(lineup, self.opponents_lineup, team_code, self.opponent_team_code, seed=seed)
                 if result[self.player_team_code] > result[self.opponent_team_code]:
                     wins += 1
             else:
-                result = simulate_game(self.players_lineup, lineup, self.player_team_code, team_code);
+                result = simulate_game(self.players_lineup, lineup, self.player_team_code, team_code, seed=seed)
                 if result[self.opponent_team_code] > result[self.player_team_code]:
                     wins += 1
-
-        return wins/n_games
+        
+        count = len(game_seeds) if game_seeds is not None else n_games
+        return wins / count
+    
 
     def tournament_selection(self, population: List[List[Player]], fitness_scores: List[float], tournament_size: int = 3) -> List[Player]:
         tournament = random.sample(list(zip(population, fitness_scores)), tournament_size)
@@ -85,9 +93,9 @@ class OptimizeLineup:
 
         while current_games < max_games:
 
-            rate_a = self.evaluate_fitness(lineup_a, team_code_a, n_games=batch_size)
-            rate_b = self.evaluate_fitness(lineup_b, team_code_b, n_games=batch_size)
-            
+            batch_seeds = [random.randint(0, 1000000000) for _ in range(batch_size)]
+            rate_a = self.evaluate_fitness(lineup_a, team_code_a, game_seeds=batch_seeds)
+            rate_b = self.evaluate_fitness(lineup_b, team_code_b, game_seeds=batch_seeds)
             wins_a += rate_a * batch_size
             wins_b += rate_b * batch_size
             current_games += batch_size
@@ -101,7 +109,7 @@ class OptimizeLineup:
             diff = fitness_b - fitness_a
             
             if abs(diff) > moe_diff and current_games >= 5000:
-                print(f"  ✅ Stopping early at {current_games} games: Statistically significant difference found.")
+                print(f"   Stopping early at {current_games} games: Statistically significant difference found.")
                 break
             
             if current_games % 10000 == 0:
@@ -152,11 +160,15 @@ class OptimizeLineup:
     
     def optimize(self, team_code: str = PLAYER_TEAM_CODE, population_size: int = 50, elite_size: int = 5, mutation_rate: float = 0.2, generations: int = 50) -> Tuple[List[Player], float]:
         population = [self.create_random_lineup(team_code) for _ in range(population_size)] 
+        
+        games_per_eval = 3000 
        
         for generation in range(generations):
+            generation_seeds = [random.randint(0, 1000000000) for _ in range(games_per_eval)]
+            
             fitness_scores = []
             for lineup in population:
-                fitness = self.evaluate_fitness(lineup, team_code)
+                fitness = self.evaluate_fitness(lineup, team_code, game_seeds=generation_seeds)
                 fitness_scores.append(fitness)
     
             best_fitness_idx = fitness_scores.index(max(fitness_scores))
