@@ -1,4 +1,5 @@
 import random
+import math
 from player import Player
 from typing import List, Optional, Tuple
 from simulation_game import simulate_game
@@ -24,7 +25,7 @@ class OptimizeLineup:
         lineup = self.players_lineup if self.player_team_code == team_code else self.opponents_lineup
         return random.sample(lineup, len(lineup)) 
 
-    def evaluate_fitness(self, lineup: List[Player], team_code: str, n_games: int = 1000) -> float:
+    def evaluate_fitness(self, lineup: List[Player], team_code: str, n_games: int = 10000) -> float:
         wins = 0
         for _ in range(n_games): 
             if(team_code == self.player_team_code): 
@@ -73,38 +74,80 @@ class OptimizeLineup:
         
         return lineup
 
-    def compare_lineups(self, lineup_a: List[Player], lineup_b: List[Player], team_code_a: str, team_code_b: str, n_games: int = 10000, lineup_a_name: str = "Lineup A", lineup_b_name: str = "Lineup B") -> dict:
+    def compare_lineups(self, lineup_a: List[Player], lineup_b: List[Player], team_code_a: str, team_code_b: str, max_games: int = 100000, batch_size: int = 1000, lineup_a_name: str = "Lineup A", lineup_b_name: str = "Lineup B") -> dict:    
         
-        fitness_a = self.evaluate_fitness(lineup_a, team_code_a, n_games)
-        fitness_b = self.evaluate_fitness(lineup_b, team_code_b, n_games)
         
+        wins_a = 0
+        wins_b = 0
+        current_games = 0
+        
+        print(f"\nComparing lineups (Checking significance every {batch_size} games up to {max_games})...")
+
+        while current_games < max_games:
+
+            rate_a = self.evaluate_fitness(lineup_a, team_code_a, n_games=batch_size)
+            rate_b = self.evaluate_fitness(lineup_b, team_code_b, n_games=batch_size)
+            
+            wins_a += rate_a * batch_size
+            wins_b += rate_b * batch_size
+            current_games += batch_size
+            
+            fitness_a = wins_a / current_games
+            fitness_b = wins_b / current_games
+            
+            se_diff = math.sqrt( (fitness_a * (1 - fitness_a) / current_games) + (fitness_b * (1 - fitness_b) / current_games) )
+            moe_diff = 1.96 * se_diff 
+            
+            diff = fitness_b - fitness_a
+            
+            if abs(diff) > moe_diff and current_games >= 5000:
+                print(f"  ✅ Stopping early at {current_games} games: Statistically significant difference found.")
+                break
+            
+            if current_games % 10000 == 0:
+                print(f"  ... {current_games} games played. Current diff: {diff*100:.2f}% (MoE: ±{moe_diff*100:.2f}%)")
+        se_a = math.sqrt((fitness_a * (1 - fitness_a)) / current_games) 
+        moe_a = 1.96 * se_a
+        
+        se_b = math.sqrt((fitness_b * (1 - fitness_b)) / current_games)
+        moe_b = 1.96 * se_b
+
         improvement = ((fitness_b - fitness_a) / fitness_a * 100) if fitness_a > 0 else 0
         
+
         print(f"\n{lineup_a_name}:")
         for i, player in enumerate(lineup_a, 1):
             print(f"  {i}. {player.name}")
-        print(f"  Win Rate: {fitness_a:.3f} ({fitness_a*100:.1f}%)")
+        print(f"  Win Rate: {fitness_a:.3f} ± {moe_a:.3f} (95% CI: [{fitness_a - moe_a:.3f}, {fitness_a + moe_a:.3f}])")
         
         print(f"\n{lineup_b_name}:")
         for i, player in enumerate(lineup_b, 1):
             print(f"  {i}. {player.name}")
-        print(f"  Win Rate: {fitness_b:.3f} ({fitness_b*100:.1f}%)")
+        print(f"  Win Rate: {fitness_b:.3f} ± {moe_b:.3f} (95% CI: [{fitness_b - moe_b:.3f}, {fitness_b + moe_b:.3f}])")
         
-        print(f"\n Results:")
+        print(f"\nResults:")
         print(f"  Improvement: {improvement:+.2f}%")
         
-        if fitness_b > fitness_a:
-            print(f" {lineup_b_name} is better!")
-        elif fitness_b < fitness_a:
-            print(f"  {lineup_a_name} is better!")
+        se_diff = math.sqrt( (fitness_a * (1 - fitness_a) / current_games) + (fitness_b * (1 - fitness_b) / current_games) )
+        moe_diff = 1.96 * se_diff
+        diff = fitness_b - fitness_a
+        
+        print(f"  Difference: {diff:.3f} ± {moe_diff:.3f}")
+        
+        if abs(diff) > moe_diff:
+            if diff > 0:
+                print(f"  {lineup_b_name} is statistically significantly better!")
+            else:
+                print(f"  {lineup_a_name} is statistically significantly better!")
         else:
-            print(f"  Both lineups perform equally")
+            print(f"  The difference is not statistically significant (within margin of error).")
         
         return {
             'lineup_a_win_rate': fitness_a,
             'lineup_b_win_rate': fitness_b,
             'improvement_pct': improvement,
-            'winner': lineup_b_name if fitness_b > fitness_a else lineup_a_name
+            'winner': lineup_b_name if fitness_b > fitness_a else lineup_a_name,
+            'statistically_significant': abs(diff) > moe_diff
         }
     
     def optimize(self, team_code: str = PLAYER_TEAM_CODE, population_size: int = 50, elite_size: int = 5, mutation_rate: float = 0.2, generations: int = 50) -> Tuple[List[Player], float]:
